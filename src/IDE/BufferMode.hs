@@ -140,10 +140,7 @@ withActiveBuf def f = inActiveBufContext alpha $ \_ _ ebuf _ _ -> f ebuf
 doForSelectedLines :: [a] -> (forall editor. TextEditor editor => EditorBuffer editor -> Int -> IDEM a) -> IDEM [a]
 doForSelectedLines d f = inActiveBufContext d $ \_ _ ebuf currentBuffer _ -> do
     (start,end) <- getStartAndEndLineOfSelection ebuf
-    beginUserAction ebuf
-    result <- mapM (f ebuf) [start .. end]
-    endUserAction ebuf
-    return result
+    inUserAction ebuf $ mapM (f ebuf) [start .. end]
 
 -- * Buffer Modes
 

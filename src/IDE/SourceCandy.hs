@@ -90,24 +90,19 @@ keystrokeCandy (CT(transformTable,_)) mbc ebuf editInCommentOrString = do
                                                 then Set.member afterChar notAfterOp
                                                 else Set.member afterChar notAfterId
             in if T.isSuffixOf from match && beforeOk && afterOk
-                then do
-                    beginNotUndoableAction ebuf
+                then inNotUndoableAction ebuf $ do
                     start   <-  getIterAtOffset ebuf (offset - T.length from)
                     end     <-  getIterAtOffset ebuf offset
                     delete ebuf start end
                     ins     <-   getIterAtMark ebuf cursorMark
                     insert ebuf ins to
-                    endNotUndoableAction ebuf
                 else replace mbAfterChar cursorMark match offset rest
 
 transformToCandy :: TextEditor editor => CandyTable -> EditorBuffer editor -> (Text -> Bool) -> IDEM ()
 transformToCandy (CT(transformTable,_)) ebuf editInCommentOrString = do
-    beginUserAction ebuf
     modified    <-  getModified ebuf
-    mapM_ (\tbl ->  replaceTo ebuf tbl 0 editInCommentOrString) transformTable
+    inUserAction ebuf $ mapM_ (\tbl ->  replaceTo ebuf tbl 0 editInCommentOrString) transformTable
     setModified ebuf modified
-    endUserAction ebuf
-
 
 replaceTo :: TextEditor editor => EditorBuffer editor -> (Bool,Text,Text) -> Int -> (Text -> Bool) -> IDEM ()
 replaceTo buf (isOp,from,to) offset editInCommentOrString = replaceTo' offset
@@ -154,10 +149,8 @@ replaceTo buf (isOp,from,to) offset editInCommentOrString = replaceTo' offset
 
 transformFromCandy :: TextEditor editor => CandyTable -> EditorBuffer editor -> IDEM ()
 transformFromCandy (CT(_,transformTableBack)) ebuf = do
-    beginUserAction ebuf
-    modified    <-  getModified ebuf
-    mapM_ (\tbl ->  replaceFrom ebuf tbl 0) transformTableBack
-    endUserAction ebuf
+    modified <-  getModified ebuf
+    inUserAction ebuf $ mapM_ (\tbl -> replaceFrom ebuf tbl 0) transformTableBack
     setModified ebuf modified
 
 simpleGtkBuffer :: Text -> IDEM (EditorBuffer GtkSourceView)
@@ -167,15 +160,10 @@ simpleGtkBuffer contents = liftIO $ GtkBuffer <$> do
     return buffer
 
 getCandylessText :: TextEditor editor => CandyTable -> EditorBuffer editor -> IDEM Text
-getCandylessText (CT(_,transformTableBack)) ebuf = do
+getCandylessText ct@(CT(_,transformTableBack)) ebuf = do
     i1          <-  getStartIter ebuf
     i2          <-  getEndIter ebuf
-    text1       <-  getText ebuf i1 i2 True
-    workBuffer  <-  simpleGtkBuffer text1
-    mapM_ (\tbl ->  replaceFrom workBuffer tbl 0) transformTableBack
-    i1          <-  getStartIter workBuffer
-    i2          <-  getEndIter workBuffer
-    getText workBuffer i1 i2 True
+    getCandylessPart ct ebuf i1 i2
 
 getCandylessPart :: TextEditor editor => CandyTable -> EditorBuffer editor -> EditorIter editor -> EditorIter editor -> IDEM Text
 getCandylessPart (CT(_,transformTableBack)) ebuf i1 i2 = do
@@ -187,7 +175,7 @@ getCandylessPart (CT(_,transformTableBack)) ebuf i1 i2 = do
     getText workBuffer i1 i2 True
 
 stringToCandy :: CandyTable -> Text -> IDEM Text
-stringToCandy  candyTable text = do
+stringToCandy candyTable text = do
     workBuffer  <-  simpleGtkBuffer text
     transformToCandy candyTable workBuffer (const False)
     i1          <-  getStartIter workBuffer

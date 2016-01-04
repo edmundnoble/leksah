@@ -301,10 +301,9 @@ replaceHLintSource (changed, delta) (from, Idea{ideaSpan = ideaSpan, ideaTo = Ju
             check <- getCandylessPart candy ebuf i1' i2'
             if check == from
                 then do
-                    beginUserAction ebuf
-                    delete ebuf i1' i2'
-                    editInsertCode ebuf i1' realString
-                    endUserAction ebuf
+                    inUserAction ebuf $ do
+                        delete ebuf i1' i2'
+                        editInsertCode ebuf i1' realString
                     return (True, delta + length (T.lines to) - length (T.lines from))
                 else return (changed, delta)
         _ -> return (changed, delta)
