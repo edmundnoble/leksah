@@ -564,11 +564,10 @@ builder' bs mbfn ind bn rbn ct prefs fileContents modTime pp nb windows =
     makeBuffer modTime buffer = do
         ideR <- ask
 
-        beginNotUndoableAction buffer
         let mod = modFromFileName mbfn
-        when (bs && isHaskellMode mod) $ modeTransformToCandy mod
-                                            (modeEditInCommentOrString mod) buffer
-        endNotUndoableAction buffer
+        inNotUndoableAction buffer $
+            when (bs && isHaskellMode mod) $ modeTransformToCandy mod
+                                                (modeEditInCommentOrString mod) buffer
         setModified buffer False
         siter <- getStartIter buffer
         placeCursor buffer siter
@@ -863,13 +862,12 @@ revert (buf@IDEBuffer{sourceView = sv}) = do
             buffer <- getBuffer sv
             fc <- liftIO $ readFile fn
             mt <- liftIO $ getModificationTime fn
-            beginNotUndoableAction buffer
-            setText buffer $ T.pack fc
-            when useCandy $
-                modeTransformToCandy (mode buf)
-                    (modeEditInCommentOrString (mode buf))
-                    buffer
-            endNotUndoableAction buffer
+            inNotUndoableAction buffer $ do
+                setText buffer $ T.pack fc
+                when useCandy $
+                    modeTransformToCandy (mode buf)
+                        (modeEditInCommentOrString (mode buf))
+                        buffer
             setModified buffer False
             return mt
             liftIO $ writeIORef (modTime buf) (Just mt)
