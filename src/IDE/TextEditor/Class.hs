@@ -224,3 +224,6 @@ class TextEditor editor where
     background :: EditorTag editor -> Color -> IDEM ()
     underline :: EditorTag editor -> Underline -> IDEM ()
 
+
+inUserAction :: EditorBuffer editor -> IDEM a -> IDEM a
+inUserAction ebuf a = beginUserAction ebuf *> a <* endUserAction ebuf

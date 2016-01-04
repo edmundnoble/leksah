@@ -595,11 +595,11 @@ findMatch exp matchIndex gtkbuf text offsetPred findLast = do
 
 editReplace :: Bool -> Bool -> Bool -> Bool -> Text -> Text -> SearchHint -> IDEM Bool
 editReplace entireWord caseSensitive wrapAround regex search replace hint =
-    editReplace' entireWord caseSensitive wrapAround regex search replace hint False
+    withActiveBuf False $ \ebuf -> inUserAction ebuf replaceAction where
+        replaceAction = editReplace' ebuf False entireWord caseSensitive wrapAround regex search replace hint
 
-editReplace' :: Bool -> Bool -> Bool -> Bool -> Text -> Text -> SearchHint -> Bool -> IDEM Bool
-editReplace' entireWord caseSensitive wrapAround regex search replace hint fromStart =
-    inActiveBufContext False $ \_ _ ebuf _ _ -> do
+editReplace' :: EditorBuffer -> Bool -> Bool -> Bool -> Bool -> Bool -> Text -> Text -> SearchHint -> IDEM Bool
+editReplace' ebuf fromStart entireWord caseSensitive wrapAround regex search replace hint = do
         insertMark <- getInsertMark ebuf
         iter       <- getIterAtMark ebuf insertMark
         offset   <- getOffset iter
@@ -616,10 +616,8 @@ editReplace' entireWord caseSensitive wrapAround regex search replace hint fromS
                         mbText <- liftIO $ replacementText regex text matchIndex matches $ T.unpack replace
                         case mbText of
                             Just text -> do
-                                beginUserAction ebuf
                                 delete ebuf iterStart iterEnd
                                 insert ebuf iterStart (T.pack text)
-                                endUserAction ebuf
                             Nothing -> do
                                 sysMessage Normal
                                     "Should never happen. findMatch worked but repleacementText failed"
@@ -628,8 +626,8 @@ editReplace' entireWord caseSensitive wrapAround regex search replace hint fromS
                     Nothing -> do
                         r <- editFind entireWord caseSensitive wrapAround regex search "" hint
                         if r
-                            then editReplace' entireWord caseSensitive wrapAround regex search
-                                    replace hint False
+                            then editReplace' False entireWord caseSensitive wrapAround regex search
+                                    replace hint
                             else return False
             Nothing -> return False
     where
@@ -656,13 +654,14 @@ regexReplacement text matchIndex matches ('\\' : n : xs) | isDigit n =
 regexReplacement text matchIndex matches (x : xs) = x : regexReplacement text matchIndex matches xs
 
 editReplaceAll :: Bool -> Bool -> Bool -> Text -> Text -> SearchHint -> IDEM Bool
-editReplaceAll = editReplaceAll' True
+editReplaceAll entireWord caseSensitive regex search replace hint = withActiveBuf $ \ebuf ->
+    inUserAction ebuf $ editReplaceAll' ebuf True entireWord caseSensitive regex search replace hint
 
-editReplaceAll' :: Bool -> Bool -> Bool -> Bool -> Text -> Text -> SearchHint -> IDEM Bool
-editReplaceAll' fromStart entireWord caseSensitive regex search replace hint = do
-    res <- editReplace' entireWord caseSensitive False regex search replace hint fromStart
+editReplaceAll' :: EditorBuffer -> Bool -> Bool -> Bool -> Bool -> Text -> Text -> SearchHint -> IDEM Bool
+editReplaceAll' ebuf fromStart entireWord caseSensitive regex search replace hint = do
+    res <- editReplace' ebuf entireWord caseSensitive False regex search replace hint fromStart
     if res
-        then editReplaceAll' False entireWord caseSensitive regex search replace hint
+        then editReplaceAll' ebuf False entireWord caseSensitive regex search replace hint
         else return False
 
 compileRegex :: Bool -> Text -> Either String Regex

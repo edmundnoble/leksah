@@ -134,6 +134,9 @@ inActiveBufContext def f = do
         Just ideBuf ->
             inBufContext def ideBuf f
 
+withActiveBuf :: alpha -> (TextEditor editor => EditorBuffer editor -> IDEM alpha) -> IDEM alpha
+withActiveBuf def f = inActiveBufContext alpha $ \_ _ ebuf _ _ -> f ebuf
+
 doForSelectedLines :: [a] -> (forall editor. TextEditor editor => EditorBuffer editor -> Int -> IDEM a) -> IDEM [a]
 doForSelectedLines d f = inActiveBufContext d $ \_ _ ebuf currentBuffer _ -> do
     (start,end) <- getStartAndEndLineOfSelection ebuf
